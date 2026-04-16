@@ -14,9 +14,7 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/chat")
-                        .allowedOrigins(
-                                "https://tu-org.lightning.force.com",
-                                "http://localhost:8080" // para pruebas
+                        .allowedOrigins("*"
                         )
                         .allowedMethods("POST")
                         .allowedHeaders("*");
