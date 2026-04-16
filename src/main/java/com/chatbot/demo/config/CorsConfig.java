@@ -14,10 +14,8 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/chat")
-                        .allowedOrigins("*"
-                        )
-                        .allowedMethods("POST")
-                        .allowedHeaders("*");
+                        .allowedOrigins("*")
+                        .allowedMethods("POST");
             }
         };
     }
