@@ -14,8 +14,7 @@ import java.util.Map;
 @Service
 public class OpenAiImp implements OpenAIService {
 
-
-    private final String API_KEY = "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";
+    private final String API_KEY = System.getenv("OPENAI_API_KEY");
     private final List<Map<String, String>> conversation = new ArrayList<>();
 
 
