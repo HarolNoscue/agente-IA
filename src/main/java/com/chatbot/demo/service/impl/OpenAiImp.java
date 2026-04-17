@@ -7,9 +7,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.text.Normalizer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class OpenAiImp implements OpenAIService {
@@ -18,6 +16,7 @@ public class OpenAiImp implements OpenAIService {
 
     private final List<Map<String, String>> conversation = new ArrayList<>();
 
+    // 🔥más palabras clave
     private final Map<String, String> knowledge = Map.of(
             "crear caso", "Para crear un caso en Salesforce debes ir al módulo de Service Cloud, seleccionar 'Casos' y hacer clic en 'Nuevo'. Luego completas la información requerida.",
             "estado caso", "Puedes consultar el estado de un caso ingresando al módulo de casos y buscando por el ID del caso.",
@@ -27,56 +26,49 @@ public class OpenAiImp implements OpenAIService {
     public OpenAiImp() {
         conversation.add(Map.of(
                 "role", "system",
-                "content", "Eres un asistente experto en Salesforce. Usa el contexto proporcionado y la conversación previa para responder claro, breve y natural. Si la pregunta depende de algo anterior, debes tenerlo en cuenta. No respondas nada fuera de Salesforce."
+                "content", "Eres un asistente experto en Salesforce. Usa el contexto y la conversación previa. Responde claro, breve y natural. No respondas nada fuera de Salesforce."
         ));
     }
 
     @Override
     public String ask(String question) {
 
-        //  Normalizar
         question = normalize(question);
 
-        // Buscar contexto
         String context = getContext(question);
 
-        // Detectar si ya hay conversación previa
         boolean hasMemory = conversation.size() > 1;
 
-        String userMessage;
-
-
-        // HAY CONTEXTO
-
+        // CONTEXTO DIRECTO
         if (!context.isEmpty()) {
-
-            userMessage = "Contexto: " + context + "\nPregunta: " + question;
-            return callOpenAI(userMessage);
+            return callOpenAI("Contexto: " + context + "\nPregunta: " + question);
         }
 
-
-        //  HAY MEMORIA (pregunta encadenada)
-
+        // MEMORIA (solo si sigue siendo Salesforce)
         if (hasMemory) {
-            return callOpenAI(question);
-        }
 
+            // combinar última interacción
+            String lastContext = getLastAssistantMessage();
+
+            String combined = lastContext + " " + question;
+
+            if (isSalesforceRelated(combined)) {
+                return callOpenAI(question);
+            }
+        }
 
         // SMALL TALK
-
-        if (isSmallTalkOnly(question)) {
+        if (isSmallTalk(question)) {
             return getSmallTalkResponse(question);
         }
 
-
-       // FUERA DE DOMINIO
-
+        // BLOQUEO
         return "Lo siento, solo puedo ayudarte con procesos de Salesforce como creación, consulta o cierre de casos.";
     }
 
-
-    //  LLAMADA A OPENAI
-
+     
+    // OPENAI
+     
     private String callOpenAI(String userMessage) {
 
         conversation.add(Map.of("role", "user", "content", userMessage));
@@ -88,7 +80,7 @@ public class OpenAiImp implements OpenAIService {
 
             String body = """
             {
-              "model": "gpt-5.4-mini",
+             "model": "gpt-5.4-mini",
               "messages": %s
             }
             """.formatted(messagesJson);
@@ -122,42 +114,65 @@ public class OpenAiImp implements OpenAIService {
         }
     }
 
-
-    // CONTEXTO
-
+     
+    // CONTEXTO INTELIGENTE
+     
     public String getContext(String question) {
 
         String normalizedQuestion = normalize(question);
+
+        String bestKey = null;
+        int bestScore = 0;
 
         for (String key : knowledge.keySet()) {
 
             String normalizedKey = normalize(key);
             String[] keyWords = normalizedKey.split(" ");
 
-            int matchCount = 0;
+            int score = 0;
 
             for (String word : keyWords) {
                 if (normalizedQuestion.contains(word)) {
-                    matchCount++;
+                    score++;
                 }
             }
 
-            if (matchCount == keyWords.length) {
-                return knowledge.get(key);
+            if (score > bestScore) {
+                bestScore = score;
+                bestKey = key;
             }
+        }
+
+        // 🔥 mínimo 1 coincidencia
+        if (bestScore >= 1) {
+            return knowledge.get(bestKey);
         }
 
         return "";
     }
 
+     
+    // VALIDAR DOMINIO
+     
+    public boolean isSalesforceRelated(String question) {
 
-    //  NORMALIZAR TEXTO
+        return question.contains("caso") ||
+                question.contains("salesforce") ||
+                question.contains("ticket") ||
+                question.contains("cliente") ||
+                question.contains("estado") ||
+                question.contains("cerrar") ||
+                question.contains("crear");
+    }
 
+     
+    //  NORMALIZAR
+     
     public String normalize(String text) {
+
         if (text == null) return "";
 
-        text = text.trim();
-        text = text.toLowerCase();
+        text = text.trim().toLowerCase();
         text = Normalizer.normalize(text, Normalizer.Form.NFD);
         text = text.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
         text = text.replaceAll("[^a-z0-9 ]", "");
@@ -166,40 +181,50 @@ public class OpenAiImp implements OpenAIService {
         return text;
     }
 
-
-    //  SMALL TALK DETECCIÓN
-
-    public boolean isSmallTalkOnly(String question) {
+     
+    // SMALL TALK
+     
+    public boolean isSmallTalk(String question) {
 
         return question.equals("hola") ||
                 question.equals("buenas") ||
                 question.equals("gracias") ||
                 question.equals("adios") ||
-                question.equals("quien eres") ||
-                question.equals("que eres");
+                question.equals("quien eres");
     }
 
-
-    //  SMALL TALK RESPUESTAS
-  
     public String getSmallTalkResponse(String question) {
 
         if (question.equals("hola") || question.equals("buenas")) {
-            return "Hola 👋 Soy un asistente que te ayuda con procesos de Salesforce. ¿En qué puedo ayudarte?";
+            return "Hola 👋 ¿En qué puedo ayudarte con Salesforce?";
         }
 
         if (question.equals("gracias")) {
             return "¡Con gusto! 😊";
         }
 
-        if (question.equals("quien eres") || question.equals("que eres")) {
-            return "Soy un asistente enfocado en ayudarte con procesos de Salesforce.";
+        if (question.equals("quien eres")) {
+            return "Soy un asistente que te ayuda con procesos de Salesforce.";
         }
 
         if (question.equals("adios")) {
             return "¡Hasta luego! 👋";
         }
 
-        return "Hola 👋 ¿En qué puedo ayudarte?";
+        return "Hola 👋";
+    }
+
+    private String getLastAssistantMessage() {
+
+        for (int i = conversation.size() - 1; i >= 0; i--) {
+
+            Map<String, String> msg = conversation.get(i);
+
+            if ("assistant".equals(msg.get("role"))) {
+                return normalize(msg.get("content"));
+            }
+        }
+
+        return "";
     }
 }
