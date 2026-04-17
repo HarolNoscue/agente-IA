@@ -28,7 +28,7 @@ public class OpenAiImp implements OpenAIService {
     public OpenAiImp() {
         conversation.add(Map.of(
                 "role", "system",
-                "content", "Eres un asistente experto en Salesforce. Usa el contexto proporcionado para responder de forma clara, natural y explicativa. No copies el contexto literalmente, sino úsalo para construir una mejor respuesta. Si no hay contexto suficiente, di que no tienes información."
+                "content", "Eres un asistente experto en Salesforce. Usa el contexto proporcionado para responder de forma clara, natural y explicativa. No copies el contexto literalmente, sino úsalo para construir una mejor respuesta pero algo puntual y no extenso. Si no hay contexto suficiente, di que no tienes información."
         ));
     }
 
